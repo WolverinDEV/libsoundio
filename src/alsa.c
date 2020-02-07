@@ -47,6 +47,17 @@ static void wakeup_outstream_poll(struct SoundIoOutStreamAlsa *osa) {
     }
 }
 
+static void wakeup_instream_poll(struct SoundIoInStreamAlsa *isa) {
+    ssize_t amt = write(isa->poll_exit_pipe_fd[1], "a", 1);
+    if (amt == -1) {
+        assert(errno != EBADF);
+        assert(errno != EIO);
+        assert(errno != ENOSPC);
+        assert(errno != EPERM);
+        assert(errno != EPIPE);
+    }
+}
+
 static void destroy_alsa(struct SoundIoPrivate *si) {
     struct SoundIoAlsa *sia = &si->backend_data.alsa;
 
@@ -1077,13 +1088,15 @@ static int instream_wait_for_poll(struct SoundIoInStreamPrivate *is) {
     int err;
     unsigned short revents;
     for (;;) {
-        if ((err = poll(isa->poll_fds, isa->poll_fd_count, -1)) < 0) {
-            return err;
+        if ((err = poll(isa->poll_fds, isa->poll_fd_count_with_extra, -1)) < 0) {
+            return SoundIoErrorStreaming;
         }
+        if (!SOUNDIO_ATOMIC_FLAG_TEST_AND_SET(isa->thread_exit_flag))
+            return SoundIoErrorInterrupted;
         if ((err = snd_pcm_poll_descriptors_revents(isa->handle,
                         isa->poll_fds, isa->poll_fd_count, &revents)) < 0)
         {
-            return err;
+            return SoundIoErrorStreaming;
         }
         if (revents & (POLLERR|POLLNVAL|POLLHUP)) {
             return 0;
@@ -1222,9 +1235,10 @@ static void instream_thread_run(void *arg) {
             case SND_PCM_STATE_RUNNING:
             case SND_PCM_STATE_PAUSED:
             {
-                if ((err = instream_wait_for_poll(is)) < 0) {
-                    if (!SOUNDIO_ATOMIC_FLAG_TEST_AND_SET(isa->thread_exit_flag))
+                if ((err = instream_wait_for_poll(is))) {
+                    if (err == SoundIoErrorInterrupted)
                         return;
+
                     instream->error_callback(instream, SoundIoErrorStreaming);
                     return;
                 }
@@ -1573,10 +1587,10 @@ static void instream_destroy_alsa(struct SoundIoPrivate *si, struct SoundIoInStr
 
     if (isa->thread) {
         SOUNDIO_ATOMIC_FLAG_CLEAR(isa->thread_exit_flag);
+        wakeup_instream_poll(isa);
         soundio_os_thread_destroy(isa->thread);
         isa->thread = NULL;
     }
-
     if (isa->handle) {
         snd_pcm_close(isa->handle);
         isa->handle = NULL;
@@ -1719,7 +1733,8 @@ static int instream_open_alsa(struct SoundIoPrivate *si, struct SoundIoInStreamP
         return SoundIoErrorOpeningDevice;
     }
 
-    isa->poll_fds = ALLOCATE(struct pollfd, isa->poll_fd_count);
+    isa->poll_fd_count_with_extra = isa->poll_fd_count + 1;
+    isa->poll_fds = ALLOCATE(struct pollfd, isa->poll_fd_count_with_extra);
     if (!isa->poll_fds) {
         instream_destroy_alsa(si, is);
         return SoundIoErrorNoMem;
@@ -1730,6 +1745,16 @@ static int instream_open_alsa(struct SoundIoPrivate *si, struct SoundIoInStreamP
         return SoundIoErrorOpeningDevice;
     }
 
+    struct pollfd *extra_fd = &isa->poll_fds[isa->poll_fd_count];
+    if (pipe2(isa->poll_exit_pipe_fd, O_NONBLOCK)) {
+        assert(errno != EFAULT);
+        assert(errno != EINVAL);
+        assert(errno == EMFILE || errno == ENFILE);
+        instream_destroy_alsa(si, is);
+        return SoundIoErrorSystemResources;
+    }
+    extra_fd->fd = isa->poll_exit_pipe_fd[0];
+    extra_fd->events = POLLIN;
     return 0;
 }
 
