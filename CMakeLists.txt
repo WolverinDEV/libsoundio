@@ -138,6 +138,21 @@ else()
     set(SOUNDIO_HAVE_WASAPI false)
 endif()
 
+if (WIN32)
+    set(CompilerFlags
+            CMAKE_C_FLAGS_DEBUG
+            CMAKE_C_FLAGS_MINSIZEREL
+            CMAKE_C_FLAGS_RELEASE
+            CMAKE_C_FLAGS_RELWITHDEBINFO
+            CMAKE_CXX_FLAGS_DEBUG
+            CMAKE_CXX_FLAGS_MINSIZEREL
+            CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    )
+    foreach(CompilerFlag ${CompilerFlags})
+        string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
+    endforeach()
+endif ()
 
 set(LIBSOUNDIO_SOURCES
     "${libsoundio_SOURCE_DIR}/src/soundio.c"
