@@ -1414,13 +1414,13 @@ static void outstream_shared_run(struct SoundIoOutStreamPrivate *os) {
     }
 
     for (;;) {
-        if (FAILED(hr = IAudioClient_GetCurrentPadding(osw->audio_client, &frames_used))) {
-            outstream->error_callback(outstream, SoundIoErrorStreaming);
-            return;
-        }
-
         auto divider = osw->shared_wait_divider;
         if(divider > 0) {
+            if (FAILED(hr = IAudioClient_GetCurrentPadding(osw->audio_client, &frames_used))) {
+                outstream->error_callback(outstream, SoundIoErrorStreaming);
+                return;
+            }
+
             osw->writable_frame_count = osw->buffer_frame_count - frames_used;
             double time_until_underrun = frames_used / (double)outstream->sample_rate;
             double wait_time = time_until_underrun / divider;
