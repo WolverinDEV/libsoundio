@@ -835,6 +835,10 @@ static int outstream_get_latency_pa(struct SoundIoPrivate *si, struct SoundIoOut
     return 0;
 }
 
+static int outstream_wasapi_set_sleep_divider_pa(struct SoundIoPrivate *si, struct SoundIoOutStreamPrivate *os, double divider) {
+    return SoundIoErrorIncompatibleBackend;
+}
+
 static void recording_stream_state_callback(pa_stream *stream, void *userdata) {
     struct SoundIoInStreamPrivate *is = (struct SoundIoInStreamPrivate*)userdata;
     struct SoundIoInStreamPulseAudio *ispa = &is->backend_data.pulseaudio;
@@ -1135,6 +1139,7 @@ int soundio_pulseaudio_init(struct SoundIoPrivate *si) {
     si->outstream_clear_buffer = outstream_clear_buffer_pa;
     si->outstream_pause = outstream_pause_pa;
     si->outstream_get_latency = outstream_get_latency_pa;
+    si->outstream_wasapi_set_sleep_divider = outstream_wasapi_set_sleep_divider_pa;
 
     si->instream_open = instream_open_pa;
     si->instream_destroy = instream_destroy_pa;

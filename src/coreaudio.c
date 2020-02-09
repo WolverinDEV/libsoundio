@@ -1132,6 +1132,10 @@ static int outstream_set_volume_ca(struct SoundIoPrivate *si, struct SoundIoOutS
     return 0;
 }
 
+static int outstream_wasapi_set_sleep_divider_ca(struct SoundIoPrivate *si, struct SoundIoOutStreamPrivate *os, double divider) {
+    return SoundIoErrorIncompatibleBackend;
+}
+
 static OSStatus on_instream_device_overload(AudioObjectID in_object_id, UInt32 in_number_addresses,
     const AudioObjectPropertyAddress in_addresses[], void *in_client_data)
 {
@@ -1474,6 +1478,7 @@ int soundio_coreaudio_init(struct SoundIoPrivate *si) {
     si->outstream_pause = outstream_pause_ca;
     si->outstream_get_latency = outstream_get_latency_ca;
     si->outstream_set_volume = outstream_set_volume_ca;
+    si->outstream_wasapi_set_sleep_divider = outstream_wasapi_set_sleep_divider_ca;
 
     si->instream_open = instream_open_ca;
     si->instream_destroy = instream_destroy_ca;

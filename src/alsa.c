@@ -1582,6 +1582,10 @@ static int outstream_get_latency_alsa(struct SoundIoPrivate *si, struct SoundIoO
     return 0;
 }
 
+static int outstream_wasapi_set_sleep_divider_alsa(struct SoundIoPrivate *si, struct SoundIoOutStreamPrivate *os, double divider) {
+    return SoundIoErrorIncompatibleBackend;
+}
+
 static void instream_destroy_alsa(struct SoundIoPrivate *si, struct SoundIoInStreamPrivate *is) {
     struct SoundIoInStreamAlsa *isa = &is->backend_data.alsa;
 
@@ -1970,6 +1974,7 @@ int soundio_alsa_init(struct SoundIoPrivate *si) {
     si->outstream_clear_buffer = outstream_clear_buffer_alsa;
     si->outstream_pause = outstream_pause_alsa;
     si->outstream_get_latency = outstream_get_latency_alsa;
+    si->outstream_wasapi_set_sleep_divider = outstream_wasapi_set_sleep_divider_alsa;
 
     si->instream_open = instream_open_alsa;
     si->instream_destroy = instream_destroy_alsa;

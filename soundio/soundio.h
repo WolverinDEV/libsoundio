@@ -1061,6 +1061,17 @@ SOUNDIO_EXPORT int soundio_outstream_get_latency(struct SoundIoOutStream *outstr
 SOUNDIO_EXPORT int soundio_outstream_set_volume(struct SoundIoOutStream *outstream,
         double volume);
 
+/// When the outputstream is in shared mode we're responsible for filling the buffer.
+/// Therefore we need an interval to fill the buffer. If divider is one the write
+/// callback will be called every time the buffer would underflow. The default value
+/// is two, so every time the buffer reached half of his samples write get called.
+/// You might want to increase this value for rt audio playback.
+///
+/// Possible errors:
+/// * #SoundIoErrorIncompatibleDevice - device does not support that setting
+/// * #SoundIoErrorIncompatibleBackend - backed does not support that setting
+SOUNDIO_EXPORT int soundio_outstream_wasapi_set_sleep_divider(struct SoundIoOutStream *outstream,
+                                                              double divider);
 
 
 // Input Streams

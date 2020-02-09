@@ -588,6 +588,10 @@ static int outstream_get_latency_jack(struct SoundIoPrivate *si, struct SoundIoO
 }
 
 
+static int outstream_wasapi_set_sleep_divider_jack(struct SoundIoPrivate *si, struct SoundIoOutStreamPrivate *os, double divider) {
+    return SoundIoErrorIncompatibleBackend;
+}
+
 static void instream_destroy_jack(struct SoundIoPrivate *si, struct SoundIoInStreamPrivate *is) {
     struct SoundIoInStreamJack *isj = &is->backend_data.jack;
 
@@ -951,6 +955,7 @@ int soundio_jack_init(struct SoundIoPrivate *si) {
     si->outstream_clear_buffer = outstream_clear_buffer_jack;
     si->outstream_pause = outstream_pause_jack;
     si->outstream_get_latency = outstream_get_latency_jack;
+    si->outstream_wasapi_set_sleep_divider = outstream_wasapi_set_sleep_divider_jack;
 
     si->instream_open = instream_open_jack;
     si->instream_destroy = instream_destroy_jack;

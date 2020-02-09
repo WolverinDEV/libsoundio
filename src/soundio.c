@@ -568,6 +568,13 @@ int soundio_outstream_set_volume(struct SoundIoOutStream *outstream, double volu
     return si->outstream_set_volume(si, os, volume);
 }
 
+int soundio_outstream_wasapi_set_sleep_divider(struct SoundIoOutStream *outstream, double divider) {
+    struct SoundIo *soundio = outstream->device->soundio;
+    struct SoundIoPrivate *si = (struct SoundIoPrivate *)soundio;
+    struct SoundIoOutStreamPrivate *os = (struct SoundIoOutStreamPrivate *)outstream;
+    return si->outstream_wasapi_set_sleep_divider(si, os, divider);
+}
+
 static void default_instream_error_callback(struct SoundIoInStream *is, int err) {
     soundio_panic("libsoundio: %s", soundio_strerror(err));
 }

@@ -1418,16 +1418,25 @@ static void outstream_shared_run(struct SoundIoOutStreamPrivate *os) {
             outstream->error_callback(outstream, SoundIoErrorStreaming);
             return;
         }
-        osw->writable_frame_count = osw->buffer_frame_count - frames_used;
-        double time_until_underrun = frames_used / (double)outstream->sample_rate;
-        double wait_time = time_until_underrun / 2.0;
-        soundio_os_mutex_lock(osw->mutex);
-        soundio_os_cond_timed_wait(osw->cond, osw->mutex, wait_time);
-        if (!SOUNDIO_ATOMIC_FLAG_TEST_AND_SET(osw->thread_exit_flag)) {
+
+        auto divider = osw->shared_wait_divider;
+        if(divider > 0) {
+            osw->writable_frame_count = osw->buffer_frame_count - frames_used;
+            double time_until_underrun = frames_used / (double)outstream->sample_rate;
+            double wait_time = time_until_underrun / divider;
+            soundio_os_mutex_lock(osw->mutex);
+            soundio_os_cond_timed_wait(osw->cond, osw->mutex, wait_time);
+            if (!SOUNDIO_ATOMIC_FLAG_TEST_AND_SET(osw->thread_exit_flag)) {
+                soundio_os_mutex_unlock(osw->mutex);
+                return;
+            }
             soundio_os_mutex_unlock(osw->mutex);
-            return;
+        } else {
+            if (!SOUNDIO_ATOMIC_FLAG_TEST_AND_SET(osw->thread_exit_flag)) {
+                return;
+            }
         }
-        soundio_os_mutex_unlock(osw->mutex);
+
         bool reset_buffer = false;
         if (!SOUNDIO_ATOMIC_FLAG_TEST_AND_SET(osw->clear_buffer_flag)) {
             if (!osw->is_paused) {
@@ -1574,6 +1583,7 @@ static int outstream_open_wasapi(struct SoundIoPrivate *si, struct SoundIoOutStr
     // for the realtime code calls the user write_callback.
 
     osw->is_raw = device->is_raw;
+    osw->shared_wait_divider = 2.0;
 
     if (!(osw->cond = soundio_os_cond_create())) {
         outstream_destroy_wasapi(si, os);
@@ -1727,6 +1737,14 @@ static int outstream_set_volume_wasapi(struct SoundIoPrivate *si, struct SoundIo
 
     outstream->volume = volume;
     return 0;
+}
+
+static int outstream_wasapi_set_sleep_divider_wasapi(struct SoundIoPrivate *si, struct SoundIoOutStreamPrivate *os, double divider) {
+    struct SoundIoOutStreamWasapi *osw = &os->backend_data.wasapi;
+    if(osw->is_raw) return SoundIoErrorIncompatibleDevice;
+
+    osw->shared_wait_divider = divider;
+    return SoundIoErrorNone;
 }
 
 static void instream_thread_deinit(struct SoundIoPrivate *si, struct SoundIoInStreamPrivate *is) {
@@ -2319,6 +2337,7 @@ int soundio_wasapi_init(struct SoundIoPrivate *si) {
     si->outstream_pause = outstream_pause_wasapi;
     si->outstream_get_latency = outstream_get_latency_wasapi;
     si->outstream_set_volume = outstream_set_volume_wasapi;
+    si->outstream_wasapi_set_sleep_divider = outstream_wasapi_set_sleep_divider_wasapi;
 
     si->instream_open = instream_open_wasapi;
     si->instream_destroy = instream_destroy_wasapi;
